@@ -12,6 +12,8 @@ target 'Chat' do
     :hermes_enabled => false
   )
 
+  pod 'RNFirebase', :path => '../node_modules/react-native-firebase'
+
   target 'ChatTests' do
     inherit! :complete
     # Pods for testing
