@@ -26,6 +26,7 @@ target 'Chat' do
 
   pod 'RNSound', :path => '../node_modules/react-native-sound'
 
+
   target 'ChatTests' do
     inherit! :complete
     # Pods for testing

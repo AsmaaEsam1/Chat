@@ -1,26 +1,26 @@
-import React, { useState, Fragment, useLayoutEffect, useEffect, useCallback } from 'react'
+import React, { useState, useLayoutEffect, useEffect, useCallback, useRef } from 'react'
 import {
-    View, Text, SafeAreaView, FlatList, KeyboardAvoidingView, TouchableWithoutFeedback, Dimensions,
-    Platform, Keyboard, PermissionsAndroid, TextInput, StyleSheet
+    View, Text, FlatList, Dimensions, Platform, PermissionsAndroid,
+    TouchableOpacity, StyleSheet
 } from 'react-native'
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker'
-import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
-import FontAwesome from 'react-native-vector-icons/FontAwesome'
 import ChatBox from '../component/ChatBox'
 import { senderMsg, recieverMsg } from '../network/messages'
 import firebase from 'react-native-firebase';
-import { Button, Icon, Thumbnail } from 'native-base'
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import { Thumbnail } from 'native-base'
 import { AudioUtils } from 'react-native-audio';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import Ionicons from 'react-native-vector-icons/Ionicons'
 import moment from 'moment/min/moment-with-locales.min'
 import { useTheme } from '@react-navigation/native'
 import { strings } from '../languages/Localization'
-import MultipleImagePicker from '@baronha/react-native-multiple-image-picker'
+import RBSheet from "react-native-raw-bottom-sheet";
+import BottomSheet from '../component/BottomSheet';
+import SendMessage from '../component/SendMessage'
+import HeaderLeft from '../component/HeaderLeft';
 const window = Dimensions.get('window')
 
-let audioRecorderPlayer = new AudioRecorderPlayer();
+const audioRecorderPlayer = new AudioRecorderPlayer();
 const ChatScreen = ({ route, navigation }) => {
     const { colors } = useTheme()
     const { params } = route;
@@ -28,7 +28,6 @@ const ChatScreen = ({ route, navigation }) => {
     const { name, img, imgText, guestUserId, currentUserId } = params;
     const [msgValue, setMsgValue] = useState('');
     const [messages, setMessages] = useState([]);
-    const [response, setResponse] = useState(null)
     const [recordTime, setRecordTime] = useState('')
     const [recordSecs, setRecordSecs] = useState(0)
     const [currentPositionSec, setCurrentPositionSec] = useState(0)
@@ -41,25 +40,25 @@ const ChatScreen = ({ route, navigation }) => {
     const [startplay, setStartPlay] = useState(true)
     const [newDate, setNewDate] = useState('')
     const [multiDate, setMultiDate] = useState('')
-    //const [image, setImage] = useState('')
-    const [images, setImages] = useState([]);
+    const [showsendicon, setShowsendicon] = useState(false)
 
+    const refRBSheet = useRef();
     let num = new Date().getTime();
     const path = AudioUtils.DocumentDirectoryPath + '/test' + num + '.m4a';
-    audioRecorderPlayer.setSubscriptionDuration(0.09);
+    // audioRecorderPlayer.setSubscriptionDuration(0.09);
 
     useLayoutEffect(() => {
         navigation.setOptions({
             headerLeft: () => (
+
                 <View style={{ marginLeft: 10 }} flexDirection="row" >
-                    <TouchableOpacity onPress={() => { navigation.navigate('Dashboard') }}>
-                        <Button transparent>
-                            {language == 'ar' ?
-                                <Ionicons size={22} name="arrow-forward" style={{ color: colors.text }} />
-                                :
-                                <Ionicons size={22} name="arrow-back" style={{ color: colors.text }} />
-                            }
-                        </Button>
+                    <TouchableOpacity style={{ alignSelf: 'center', marginRight: 10 }}
+                        onPress={() => navigation.navigate('Dashboard')}>
+                        {language == 'ar' ?
+                            <Ionicons size={22} name="arrow-forward" style={{ color: colors.text }} />
+                            :
+                            <Ionicons size={22} name="arrow-back" style={{ color: colors.text }} />
+                        }
                     </TouchableOpacity>
                     <View style={[{ borderColor: colors.text }, styles.logoContainer]} >
                         {img ? (
@@ -72,17 +71,14 @@ const ChatScreen = ({ route, navigation }) => {
                 </View>
             ),
             headerRight: () => (
-                <View flexDirection="row" >
+                <View style={{ flexDirection: 'row', marginRight: 20, justifyContent: 'space-between' }} >
 
                     <TouchableOpacity onPress={() => { voiceCallTap() }}>
-                        <Button transparent>
-                            <Icon type="MaterialIcons" name="call" size={50} style={{ color: '#70db70' }} />
-                        </Button>
+                        <Ionicons name="call" size={25} style={{ color: '#70db70' }} />
                     </TouchableOpacity>
+
                     <TouchableOpacity onPress={() => { vedioCallTap() }}>
-                        <Button transparent >
-                            <Icon type="MaterialIcons" name="videocam" style={{ right: 10, color: '#70db70' }} />
-                        </Button>
+                        <Ionicons name="videocam" size={25} style={{ marginLeft: 20, color: '#70db70' }} />
                     </TouchableOpacity>
                 </View>
             )
@@ -91,6 +87,12 @@ const ChatScreen = ({ route, navigation }) => {
 
 
     useEffect(() => {
+        if (msgValue === '') {
+            setShowsendicon(false)
+        }
+        else {
+            setShowsendicon(true)
+        }
         try {
             //connected to real-time database and sent messages
             firebase.database('https://chat-9c21b-default-rtdb.firebaseio.com/')
@@ -134,7 +136,7 @@ const ChatScreen = ({ route, navigation }) => {
     const handleSend = () => {
         setMsgValue('')
         setNewDate('')
-
+        setShowsendicon(false)
         if (msgValue) {
             senderMsg(msgValue, newDate, currentUserId, guestUserId, '', '', '')
                 .then(() => { })
@@ -194,25 +196,25 @@ const ChatScreen = ({ route, navigation }) => {
                 return;
             }
         }
-        const uri = await audioRecorderPlayer.startRecorder(path).catch(err => console.log(err.message));
+        await audioRecorderPlayer.startRecorder(path).catch(err => console.log(err.message));
         audioRecorderPlayer.addRecordBackListener((e) => {
-            setRecordSecs(e.current_position)
-            setRecordTime(audioRecorderPlayer.mmss(Math.floor(e.current_position / 1000)))
+            setRecordSecs(e.currentPosition)
+            setRecordTime(audioRecorderPlayer.mmss(Math.floor(e.currentPosition / 1000)))
         });
-        console.log(`uri: ${uri}`);
         setStartRecord(false)
+        //
     }
     const onStopRecord = async () => {
-        setNewDate('')
-        const result = await audioRecorderPlayer.stopRecorder().catch(err => console.log(err.message));
-        audioRecorderPlayer.removeRecordBackListener();
+        const result = await audioRecorderPlayer.stopRecorder().catch(err => console.log(err))
+        audioRecorderPlayer.removeRecordBackListener()
         setRecordSecs(0)
         setRecordTime('')
         setStartRecord(true)
+
         const reference = firebase.storage().ref('Voicenote/' + path)
-        const task = reference.putFile(result).then(() => {
-            console.log('Image uploaded to the bucket!');
-            reference.getDownloadURL().then(results => {
+        const task = reference.putFile(result)
+        task.then(async () => {
+            await reference.getDownloadURL().then(results => {
                 senderMsg(msgValue, newDate, currentUserId, guestUserId, '', results, recordTime)
                     .then(() => { })
                     .catch((err) => alert(err));
@@ -235,15 +237,15 @@ const ChatScreen = ({ route, navigation }) => {
         audioRecorderPlayer.setVolume(1.0);
         console.log(msg);
         audioRecorderPlayer.addPlayBackListener((e) => {
-            if (e.current_position === e.duration) {
+            if (e.currentPosition === e.duration) {
                 console.log('finished');
                 audioRecorderPlayer.stopPlayer().catch(err => console.log(err.message));
                 setStartPlay(true)
                 setProgress(false)
             }
 
-            setCurrentPositionSec(e.current_position)
-            setPlayTime(audioRecorderPlayer.mmss(Math.floor(e.current_position / 1000)))
+            setCurrentPositionSec(e.currentPosition)
+            setPlayTime(audioRecorderPlayer.mmss(Math.floor(e.currentPosition / 1000)))
             setCurrentDurationSec(e.duration)
             setDuration(audioRecorderPlayer.mmss(Math.floor(e.duration / 1000)))
         });
@@ -255,8 +257,15 @@ const ChatScreen = ({ route, navigation }) => {
         await audioRecorderPlayer.pausePlayer().catch(err => console.log(err));
     }
     //get uri of image and send or recevie img in real-time database
-    const handleCamera = useCallback((type, options) => {
+    const handleCamera = useCallback(() => {
+
         try {
+            const options = {
+                maxWidth: 400,
+                maxHeight: 400,
+                quality: 0.4
+            }
+            refRBSheet.current.close()
             launchCamera(options, (responses) => {
                 responses.assets.map(({ uri, fileName }) => {
                     let reference = firebase.storage().ref('Photos/' + fileName)
@@ -285,37 +294,44 @@ const ChatScreen = ({ route, navigation }) => {
         }
     })
 
-    const handlePhoto = async () => {
+    const handlePhoto = useCallback(async () => {
         try {
-            const response = await MultipleImagePicker.openPicker({
-                selectedAssets: images,
-                isExportThumbnail: true,
-                maxVideo: 1,
-                usedCameraButton: false,
-            });
-            //   setImages(response);
-            let reference = await firebase.storage().ref('Photos/' + response)
-            let task = reference.putFile(uri)
-            task.then(async () => {
-                console.log('Image uploaded to the bucket!');
-                await reference.getDownloadURL().then(result => {
-                    senderMsg(msgValue, newDate, currentUserId, guestUserId, result, '', '')
-                        .then(() => { })
-                        .catch((err) => alert(err));
+            const options = {
+                maxWidth: 300,
+                maxHeight: 300,
+                quality: 0.3
+            }
+            refRBSheet.current.close()
+            launchImageLibrary(options, (responses) => {
+                responses.assets.map(({ uri, fileName }) => {
+                    //   setImages(response);
+                    let reference = firebase.storage().ref('Photos/' + fileName)
+                    let task = reference.putFile(uri)
+                    task.then(async () => {
+                        console.log('Image uploaded to the bucket!');
+                        await reference.getDownloadURL().then(result => {
+                            senderMsg(msgValue, newDate, currentUserId, guestUserId, result, '', '')
+                                .then(() => { })
+                                .catch((err) => alert(err));
 
-                    // * guest user
+                            // * guest user
 
-                    recieverMsg(msgValue, newDate, currentUserId, guestUserId, result, '', '')
-                        .then(() => { })
-                        .catch((err) => alert(err));
+                            recieverMsg(msgValue, newDate, currentUserId, guestUserId, result, '', '')
+                                .then(() => { })
+                                .catch((err) => alert(err));
+                        })
+                    })
                 })
             })
 
         } catch (error) {
             console.log(error)
         }
-    }
+    })
+    const handleFiles = () => {
+        refRBSheet.current.close()
 
+    }
     const handleOnChange = (text) => {
         setMsgValue(text);
     }
@@ -331,120 +347,81 @@ const ChatScreen = ({ route, navigation }) => {
     const vedioCallTap = () => {
         navigation.navigate('SenderVoiceCalling', { name, img })
     }
+
     return (
-
         <View style={{ flex: 1 }}>
+            <FlatList
+                inverted
+                data={messages}
+                keyExtractor={(_, index) => index.toString()}
+                renderItem={({ item, index }) => {
+                    return (
+                        <View>
+                            {item.newDate == 'newDate' ?
+                                <Text style={{ color: '#BFC9CA', alignSelf: 'center' }}>
+                                    {item.dates}
+                                </Text> : null
+                            }
+                            <ChatBox
+                                msg={item.msg}
+                                userId={item.sendBy}
+                                date={item.createdAt}
+                                img={item.img}
+                                onImgTap={() => imgTap(item.img)}
+                                onAudioTap={() => onStartPlay(item.audio, item)}
+                                onAudioPause={() => onPausePlay()}
+                                playTimes={active == item ?
+                                    playTimes = playTime :
+                                    playTimes = item.audioDuration}
 
-            <View style={{ flex: 1 }}>
-
-                <FlatList
-                    inverted
-                    data={messages}
-                    keyExtractor={(_, index) => index.toString()}
-                    renderItem={({ item, index }) => {
-
-                        return (
-                            <View>
-                                {item.newDate != '' ?
-                                    <Text style={{ color: '#BFC9CA', alignSelf: 'center' }}>
-                                        {item.dates}
-                                    </Text> : null
+                                show={active == item ?
+                                    show = startplay : show = true
                                 }
-                                <ChatBox
-                                    msg={item.msg}
-                                    userId={item.sendBy}
-                                    date={item.createdAt}
-                                    img={item.img}
-                                    onImgTap={() => imgTap(item.img)}
-                                    onAudioTap={() => onStartPlay(item.audio, item)}
-                                    onAudioPause={() => onPausePlay()}
-                                    playTimes={active == item ?
-                                        playTimes = playTime :
-                                        playTimes = item.audioDuration}
+                                playprogress={
+                                    active == item ? playprogress = progress : playprogress = false
+                                }
+                            />
+                        </View>
+                    )
+                }} />
 
-                                    show={active == item ?
-                                        show = startplay : show = true
-                                    }
-                                    playprogress={
-                                        active == item ? playprogress = progress : playprogress = false
-                                    }
-                                />
-                            </View>)
-                    }
-                    } />
+            {/*Send Message*/}
 
-                {/*Send Message*/}
+            <SendMessage
+                strings={strings}
+                recordTime={recordTime}
+                msgValue={msgValue}
+                startrecord={startrecord}
+                openBottomSheet={() => refRBSheet.current.open()}
+                showsendicon={showsendicon}
+                onKeyPress={() => setShowsendicon(true)}
+                onBlur={() => setShowsendicon(false)}
+                handleOnChange={handleOnChange}
+                startRecord={startRecord}
+                onStopRecord={onStopRecord}
+                handleSend={handleSend}
+                onSubmitEditing={() => setShowsendicon(false)}
+            />
 
-                <View style={styles.sendMessageContainer}>
-                    <TextInput
-                        placeholder={strings.typeHere}
-                        numberOfLines={10}
-                        style={[{ color: colors.text }, styles.input]}
-                        value={msgValue}
-                        onChangeText={(text) => handleOnChange(text)} />
-
-                    <View style={styles.sendBtnContainer}>
-                        <Text style={{ color: colors.text, marginRight: 10 }}>{recordTime}</Text>
-                        {startrecord ? (<TouchableOpacity onPress={() => startRecord()}>
-                            <MaterialCommunityIcons
-                                name='microphone'
-                                color='#70db70'
-                                size={35} />
-                        </TouchableOpacity>
-                        ) : (<TouchableOpacity onPress={() => onStopRecord()}>
-                            <Icon
-                                name="stop-circle-outline"
-                                style={{ color: '#70db70' }} fontSize={35} />
-                        </TouchableOpacity>
-                        )}
-                    </View>
-                    <TouchableOpacity onPress={() => handleCamera()}>
-                        <MaterialCommunityIcons
-                            name="camera"
-                            color='#70db70'
-                            size={30} />
-
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handlePhoto()}>
-                        <FontAwesome
-                            name="photo"
-                            color='#70db70'
-                            size={25}
-                            style={{ marginLeft: 5, marginRight: 5 }}
-                        />
-
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => handleSend()}>
-                        <MaterialCommunityIcons
-                            name="send-circle"
-                            color='#70db70'
-                            style={{ transform: (strings.getLanguage() === 'ar' ? [{ rotate: '180deg' }] : [{ rotate: '0deg' }]) }}
-                            size={35} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-        </View>
+            <RBSheet
+                ref={refRBSheet}
+                closeOnDragDown={true}
+                closeOnPressMask={true}
+                customStyles={{
+                    container: { backgroundColor: colors.card },
+                    draggableIcon: { backgroundColor: colors.text }
+                }}>
+                <BottomSheet
+                    handleCamera={handleCamera}
+                    handlePhoto={handlePhoto}
+                    handleFiles={handleFiles}
+                />
+            </RBSheet>
+        </View >
     )
 
 };
 const styles = StyleSheet.create({
-    sendMessageContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        alignContent: "center",
-        width: window.width,
-        height: 50,
-        borderRadius: 20,
-        marginLeft: 5,
-        marginRight: 5
-    },
-    input: {
-        borderTopLeftRadius: 20,
-        borderBottomLeftRadius: 20,
-        width: "55%",
-    },
     recorder_container: {
         flex: 1,
         backgroundColor: "#2b608a",
@@ -453,17 +430,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "flex-end",
         flexDirection: "row",
-    },
-
-    thumbnailName: { fontSize: 20, fontWeight: "500" },
-    logoContainer: {
-        height: 40,
-        width: 40,
-        borderWidth: 1,
-        borderRadius: 20,
-        marginLeft: 10,
-        alignItems: "center",
-        justifyContent: "center",
+        width: "20%"
     },
 })
 export default ChatScreen;
